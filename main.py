@@ -1,16 +1,25 @@
-# This is a sample Python script.
+import dpkt
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+def print_pcap_hex(filename):
+    try:
+        # Open the pcap file for reading
+        with open(filename, 'rb') as pcap_file:
+            pcap = dpkt.pcap.Reader(pcap_file)
+            packet_count = 0
 
+            for ts, buf in pcap:
+                # Convert packet data to hexadecimal format
+                hex_data = ' '.join(['{:02X}'.format(byte) for byte in buf])
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+                # Print the hexadecimal data to the console
+                print(f"Packet {packet_count + 1} (Length: {len(buf)} bytes):\n{hex_data}\n")
+                packet_count += 1
 
+    except FileNotFoundError:
+        print(f"File not found: {filename}")
+    except Exception as e:
+        print(f"Error reading the pcap file: {e}")
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    pcap_filename = "eth-1.pcap"
+    print_pcap_hex(pcap_filename)
