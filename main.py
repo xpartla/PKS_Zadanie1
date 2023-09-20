@@ -21,5 +21,5 @@ def print_pcap_hex(filename):
         print(f"Error reading the pcap file: {e}")
 
 if __name__ == "__main__":
-    pcap_filename = "eth-1.pcap"
+    pcap_filename = "eth-2.pcap"
     print_pcap_hex(pcap_filename)
