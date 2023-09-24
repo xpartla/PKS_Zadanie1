@@ -10,6 +10,22 @@ def extract_ethertype(raw_packet):
     else:
         return None
 
+
+def extract_8023_type(raw_packet):
+    # 3 bytes in header - Dest MAC, Src MAC, Control
+    if len(raw_packet) >= 3:
+        control = int.from_bytes(raw_packet[2:3], byteorder='big')
+
+        if control == 0xaaaa03:
+            return "IEEE 802.3 LLC and SNAP"
+        elif control == 0xaaaa:
+            return "IEEE 802.3 LLC"
+        else:
+            return "IEEE 802.3 RAW"
+    else:
+        return None
+
+
 def print_pcap_hex(filename):
     try:
         # Read the pcap file using rdpcap
@@ -25,7 +41,7 @@ def print_pcap_hex(filename):
             if eth_type is not None:
                 if eth_type <= 1500:
                     eth_length = 2
-                    packet_type = "IEEE 802.3"
+                    packet_type = extract_8023_type(bytes(packet))
                 else:
                     eth_length = 14
                     packet_type = "Ethernet II"
@@ -33,7 +49,6 @@ def print_pcap_hex(filename):
                 # If there is no EtherType, label it as "Unknown"
                 packet_type = "Unknown"
 
-                
             # Convert packet data to hexadecimal format
             hex_data = ' '.join(['{:02X}'.format(byte) for byte in bytes(packet)])
 
