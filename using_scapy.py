@@ -3,6 +3,13 @@ import binascii
 from scapy.all import rdpcap
 
 
+def extract_ethertype(raw_packet):
+    if len(raw_packet) >= 14:
+        ether_type_bytes = raw_packet[12:14]
+        return int.from_bytes(ether_type_bytes, byteorder='big')
+    else:
+        return None
+
 def print_pcap_hex(filename):
     try:
         # Read the pcap file using rdpcap
@@ -12,32 +19,21 @@ def print_pcap_hex(filename):
         for packet in packets:
             eth_length = 0
 
-            if len(packet) < 60:
-                eth_length = 4
-            # Ethernet II
-            else:
-                decimal_num = int(str(binascii.hexlify(packet[12:14]))[2: -1], 16)
-            if decimal_num > 1500:
-                packet_type = "Ethernet II"
-                eth_length = 14
+            # Extract the EtherType field
+            eth_type = extract_ethertype(bytes(packet))
 
-            else:
-                # Novell 802.3 RAW -> +3 (Control field)
-                if str(binascii.hexlify(packet[14:16]))[2: -1] == "ffff":
-                    packet_type = "Novell 802.3 RAW"
-                    eth_length = 17
-
-                #IEEE 802.3 LLC + SNAP
-                elif str(binascii.hexlify(packet[14:15]))[2: -1] == "aa":
-                    packet_type = "IEEE 802.3 SNAP"
-                    eth_length = 22
-
-                # IEEE 802.3 LLC
+            if eth_type is not None:
+                if eth_type <= 1500:
+                    eth_length = 2
+                    packet_type = "IEEE 802.3"
                 else:
-                    decimal_num = int(str(binascii.hexlify(packet[14:15]))[2: -1], 16)
-                    packet_type = "IEEE 802.3 LLC"
-                    eth_length = 18
+                    eth_length = 14
+                    packet_type = "Ethernet II"
+            else:
+                # If there is no EtherType, label it as "Unknown"
+                packet_type = "Unknown"
 
+                
             # Convert packet data to hexadecimal format
             hex_data = ' '.join(['{:02X}'.format(byte) for byte in bytes(packet)])
 
