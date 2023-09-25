@@ -1,4 +1,4 @@
-import binascii
+#import binascii
 
 from scapy.all import rdpcap
 
@@ -48,6 +48,19 @@ def extract_ether(raw_packet):
         return None
 
 
+def format_mac(mac_bytes):
+    return ':'.join(['{:02X}'.format(byte) for byte in mac_bytes])
+
+
+def extract_mac(raw_packet):
+    if len(raw_packet) >= 12:
+        dest = format_mac(raw_packet[0:6])
+        src = format_mac(raw_packet[6:12])
+        return dest, src
+    else:
+        return None, None
+
+
 def print_pcap_hex(filename):
     try:
         # Read the pcap file using rdpcap
@@ -59,20 +72,21 @@ def print_pcap_hex(filename):
             packet_type = "Unknown"
             sap_name = ""
             ethertype_name = ""
+            dest, src = extract_mac(bytes(packet))
 
             # Extract the EtherType field
             eth_type = extract_ethertype(bytes(packet))
 
             if eth_type is not None:
                 if eth_type <= 1500:
-                    eth_length = 2
+                    eth_length = 4
                     packet_type = extract_8023_type(bytes(packet))
                     if packet_type == "IEEE 802.3 LLC" or packet_type == "IEEE 802.3 LLC and SNAP":
                         sap_name = get_sap_name(extract_sap(bytes(packet)))
                     if packet_type == "IEEE 802.3 LLC and SNAP":
                         ethertype_name = get_ethertype_name(extract_ether(bytes(packet)))
                 else:
-                    eth_length = 14
+                    eth_length = 4
                     packet_type = "Ethernet II"
             else:
                 # If there is no EtherType, label it as "Unknown"
@@ -85,6 +99,8 @@ def print_pcap_hex(filename):
 
             # Print the packet information
             print(f"Packet {packet_count + 1}")
+            print(f"Destination Address: {dest}")
+            print(f"Source Address: {src}")
             print(f"Packet type: {packet_type}")
             if packet_type == "IEEE 802.3 LLC" or packet_type == "IEEE 802.3 LLC and SNAP":
                 print(f"SAP: {sap_name}")
