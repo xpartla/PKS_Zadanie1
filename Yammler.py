@@ -93,7 +93,6 @@ def main():
 
             hexa_frame_content = '\n'.join([' '.join(row) for row in rows_of_16])
 
-            # Create a LiteralScalarString without the '-' at the beginning
             hexa_frame_literal = LiteralScalarString(f"{hexa_frame_content}\n")
 
             packet_data = {
@@ -106,7 +105,7 @@ def main():
                 "hexa_frame": hexa_frame_literal,
             }
 
-            if sap_name:
+            if sap_name and ethertype_name == None:
                 packet_data["sap"] = sap_name
 
             if ethertype_name:
@@ -140,13 +139,14 @@ def get_sap_name(sap):
         0x03: "LLC Sublayer Management / Group",
         0x06: "IP (DoD Internet Protocol)",
         0x0E: "PROWAY (IEC 955) Network Management, Maintenance and Installation",
-        0x42: "BPDU (Bridge PDU / 802.1 Spanning Tree)",
+        0x42: "STP",
         0x4E: "MMS (Manufacturing Message Service) EIA-RS 511",
         0x5E: "ISI IP",
         0x7E: "X.25 PLP (ISO 8208)",
         0x8E: "PROWAY (IEC 955) Active Station List Maintenance",
         0xAA: "SNAP (Sub-Network Access Protocol / non-IEEE SAPs)",
-        0xE0: "IPX (Novell NetWare)",
+        0xE0: "IPX",
+        0xF0: "NETBIOS",
         0xF4: "LAN Management",
         0xFE: "ISO Network Layer Protocols",
         0xFF: "Global DSAP"
@@ -157,7 +157,9 @@ def get_sap_name(sap):
 def get_ethertype_name(ethertype):
     ethertype_mappings = {
         0x200: "XEROX PUP",
+        0x2000: "CDP",
         0x2004: "DTP",
+        0x010B: "PVSTP+",
         0x0201: "PUP Addr Trans",
         0x0800: "Internet IP (IPv4)",
         0x0801: "X.75 Internet",
