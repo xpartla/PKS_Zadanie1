@@ -3,7 +3,6 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 
-
 def extract_ethertype(raw_packet):
     if len(raw_packet) >= 14:
         ether_type_bytes = raw_packet[12:14]
@@ -18,7 +17,7 @@ def extract_8023_type(raw_packet):
         if control == 0X03:  # IEEE 802.3 LLC / LLC + SNAP
             snap_check = int.from_bytes(raw_packet[15:16], byteorder='big')
             if snap_check == 0XAA:
-                return "IEEE 802.3 LLC and SNAP"
+                return "IEEE 802.3 LLC & SNAP"
             else:
                 return "IEEE 802.3 LLC"
         else:
@@ -64,41 +63,39 @@ def main():
 
     try:
         packets = rdpcap(pcap_filename)
-        packet_count = 0
 
-        for packet in packets:
+        for packet_count, packet in enumerate(packets):
             eth_length = 0
             packet_type = "Unknown"
             sap_name = None
             ethertype_name = None
             dest, src = extract_mac(bytes(packet))
 
-            # Extract the EtherType field
             eth_type = extract_ethertype(bytes(packet))
 
             if eth_type is not None:
                 if eth_type <= 1500:
                     eth_length = 4
                     packet_type = extract_8023_type(bytes(packet))
-                    if packet_type == "IEEE 802.3 LLC" or packet_type == "IEEE 802.3 LLC and SNAP":
+                    if packet_type == "IEEE 802.3 LLC" or packet_type == "IEEE 802.3 LLC & SNAP":
                         sap_name = get_sap_name(extract_sap(bytes(packet)))
-                    if packet_type == "IEEE 802.3 LLC and SNAP":
+                    if packet_type == "IEEE 802.3 LLC & SNAP":
                         ethertype_name = get_ethertype_name(extract_ether(bytes(packet)))
                 else:
                     eth_length = 4
-                    packet_type = "Ethernet II"
+                    packet_type = "ETHERNET II"
             else:
-                # If there is no EtherType, label it as "Unknown"
                 packet_type = "Unknown"
 
-            # Convert packet data to hexadecimal format
             hex_data = ' '.join(['{:02X}'.format(byte) for byte in bytes(packet)])
             hex_numbers = hex_data.split()
             rows_of_16 = [hex_numbers[i:i + 16] for i in range(0, len(hex_numbers), 16)]
 
-            #hexa_frame_str = '| \n' + '\n'.join([' '.join(line) for line in rows_of_16])
+            hexa_frame_content = '\n'.join([' '.join(row) for row in rows_of_16])
 
-            # Create a dictionary for the packet data
+            # Create a LiteralScalarString without the '-' at the beginning
+            hexa_frame_literal = LiteralScalarString(f"{hexa_frame_content}\n")
+
             packet_data = {
                 "frame_number": packet_count + 1,
                 "len_frame_pcap": len(packet),
@@ -106,7 +103,7 @@ def main():
                 "frame_type": packet_type,
                 "src_mac": src,
                 "dst_mac": dest,
-                "hexa_frame": LiteralScalarString('\n'.join([' '.join(row) for row in rows_of_16])),
+                "hexa_frame": hexa_frame_literal,
             }
 
             if sap_name:
@@ -116,8 +113,6 @@ def main():
                 packet_data["pid"] = ethertype_name
 
             packets_data.append(packet_data)
-
-            packet_count += 1
 
     except FileNotFoundError:
         print(f"File not found: {pcap_filename}")
@@ -130,10 +125,11 @@ def main():
         "packets": packets_data,
     }
 
+    # Create YAML object with proper indentation
     yaml = YAML()
+    yaml.indent(offset=2, sequence=4)
+
     with open("output.yaml", "w") as yaml_file:
-        yaml = YAML()
-        yaml.indent(offset=2)
         yaml.dump(yaml_data, yaml_file)
 
 
