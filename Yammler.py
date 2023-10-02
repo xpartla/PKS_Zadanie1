@@ -98,7 +98,7 @@ def main():
             packet_data = {
                 "frame_number": packet_count + 1,
                 "len_frame_pcap": len(packet),
-                "len_frame_medium": len(packet) + eth_length,
+                "len_frame_medium": max(64, len(packet) + eth_length),
                 "frame_type": packet_type,
                 "src_mac": src,
                 "dst_mac": dest,
@@ -124,7 +124,6 @@ def main():
         "packets": packets_data,
     }
 
-    # Create YAML object with proper indentation
     yaml = YAML()
     yaml.indent(offset=2, sequence=4)
 
@@ -180,5 +179,5 @@ def get_ethertype_name(ethertype):
     return ethertype_mappings.get(ethertype)
 
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+main()
