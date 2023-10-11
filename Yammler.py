@@ -1,3 +1,4 @@
+import os
 from binascii import hexlify
 from collections import Counter
 from scapy.all import rdpcap
@@ -93,8 +94,41 @@ def extract_UDP_protocols(raw_packet):
     else:
         return None
 
+def extract_TCP_protocols(raw_packet):
+    if len(raw_packet) >= 38:
+        return int.from_bytes(raw_packet[34:36], byteorder='big'),int.from_bytes(raw_packet[36:38], byteorder='big')
+    else:
+        return None
+
 def main():
+    file_choice = input("Press ENTER for DEFAULT FILE, or specify file name:")
     pcap_filename = "trace-27.pcap"
+    if file_choice:
+        try:
+            with open(file_choice, 'r'):
+                pcap_filename = file_choice
+        except FileNotFoundError:
+            print(f"File: '{file_choice}' not found, using default file")
+
+    mode = input("Press ENTER for BASIC setup, or -p for PROTOCOL")
+    if mode == 'p':
+        input_protocol = input("Specify the protocol you want to filter (HTTP, HTTPS, TELNET, SSH, FTP-R, FTP-D)").strip().upper()
+        if input_protocol == "HTTP":
+            pass
+        elif input_protocol == "TELNET":
+            pass
+        elif input_protocol == "HTTPS":
+            pass
+        elif input_protocol == "SSH":
+            pass
+        elif input_protocol == "FTP-R":
+            pass
+        elif input_protocol == "FTP-D":
+            pass
+        else:
+            pass
+    else:
+        pass
     packets_data = []
     source_ip_counter = Counter()
 
@@ -111,8 +145,16 @@ def main():
         for line in udp_file:
             parts = line.strip().split(":")
             if len(parts) == 2:
-                udp_prot, well_known_protocol = int(parts[0]), parts[1]
-                udp_well_known_data[udp_prot] = well_known_protocol
+                udp_prot, udp_well_known_protocol = int(parts[0]), parts[1]
+                udp_well_known_data[udp_prot] = udp_well_known_protocol
+
+    tcp_well_known_data = {}
+    with open("Tcp_protocol_data.txt", "r") as tcp_file:
+        for line in tcp_file:
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                tcp_prot, tcp_well_known_protocol = int(parts[0]), parts[1]
+                tcp_well_known_data[tcp_prot] = tcp_well_known_protocol
 
     ipv4_protocol_data = {}
     with open("Ipv4_protocol_data.txt", "r") as ipv4_file:
@@ -140,7 +182,8 @@ def main():
             ipv4_type = extract_ipv4_protocol(bytes(packet))
             eth_type = extract_ethertype(bytes(packet))
             udp_src, udp_dest = extract_UDP_protocols(bytes(packet))
-            print(udp_dest)
+            tcp_src, tcp_dest = extract_TCP_protocols(bytes(packet))
+            #print(udp_dest)
 
             if eth_type is not None:
                 if eth_type <= 1500:
@@ -169,11 +212,19 @@ def main():
 
                             if ipv4_type in ipv4_protocol_data:
                                 ipv4_protocol = ipv4_protocol_data[ipv4_type]
+                                #print(ipv4_protocol)
 
-                            if udp_src in udp_well_known_data:
-                                well_known_src = udp_well_known_data[udp_src]
-                            if udp_dest in udp_well_known_data:
-                                well_known_dst = udp_well_known_data[udp_dest]
+                            if ipv4_protocol == "TCP":
+                                if tcp_src in tcp_well_known_data:
+                                    well_known_src = tcp_well_known_data[tcp_src]
+                                if tcp_dest in tcp_well_known_data:
+                                    well_known_dst = tcp_well_known_data[tcp_dest]
+
+                            if ipv4_protocol == "UDP":
+                                if udp_src in udp_well_known_data:
+                                    well_known_src = udp_well_known_data[udp_src]
+                                if udp_dest in udp_well_known_data:
+                                    well_known_dst = udp_well_known_data[udp_dest]
 
 
                         if eth_type == 34525: #IPV6
@@ -220,12 +271,21 @@ def main():
                     packet_data["IpV4 protocol"] = ipv4_protocol
                     print(ipv4_protocol)
 
-                packet_data["udp_src"] = udp_src
-                packet_data["udp_dest"] = udp_dest
-                if well_known_src:
-                    packet_data["udp src well known port"] = well_known_src
-                if well_known_dst:
-                    packet_data["udp dst well known port"] = well_known_dst
+                if ipv4_protocol == "UDP":
+                    packet_data["udp_src"] = udp_src
+                    packet_data["udp_dest"] = udp_dest
+                    if well_known_src:
+                        packet_data["udp src well known port"] = well_known_src
+                    if well_known_dst:
+                        packet_data["udp dst well known port"] = well_known_dst
+
+                if ipv4_protocol == "TCP":
+                    packet_data["tcp_src"] = tcp_src
+                    packet_data["tcp_dest"] = tcp_dest
+                    if well_known_src:
+                        packet_data["tcp src well known port"] = well_known_src
+                    if well_known_dst:
+                        packet_data["tcp dst well known port"] = well_known_dst
 
 
             packets_data.append(packet_data)
