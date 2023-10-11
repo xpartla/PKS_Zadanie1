@@ -1,5 +1,5 @@
 from binascii import hexlify
-
+from collections import Counter
 from scapy.all import rdpcap
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
@@ -96,6 +96,7 @@ def extract_UDP_protocols(raw_packet):
 def main():
     pcap_filename = "trace-27.pcap"
     packets_data = []
+    source_ip_counter = Counter()
 
     ethertype_data = {}
     with open("Ethertype_data.txt", "r") as ethertype_file:
@@ -162,6 +163,10 @@ def main():
                         if eth_type == 2048: #IPV4
                             src_ip, dst_ip = extract_ipv4_ip(bytes(packet))
 
+                            #uloha 3
+                            if src_ip:
+                                source_ip_counter[src_ip] += 1
+
                             if ipv4_type in ipv4_protocol_data:
                                 ipv4_protocol = ipv4_protocol_data[ipv4_type]
 
@@ -224,6 +229,17 @@ def main():
 
 
             packets_data.append(packet_data)
+
+        most_common_ip, most_common_count = source_ip_counter.most_common(1)[0]
+        print("ipv4_senders:")
+
+        for ip, count in source_ip_counter.items():
+            print("  - node:", ip)
+            print("    number_of_sent_packets:", count)
+
+        print("max_send_packets_by:")
+        print("  -", most_common_ip)
+
 
     except FileNotFoundError:
         print(f"File not found: {pcap_filename}")
