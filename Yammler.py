@@ -100,6 +100,53 @@ def extract_TCP_protocols(raw_packet):
     else:
         return None
 
+
+def extract_flag(raw_packet):
+    if len(raw_packet) >= 48:
+        return int.from_bytes(raw_packet[47:48], byteorder='big')
+    else:
+        return None
+
+tcp_connections = [None, None]
+comm_open = [None, None, None]
+comm_close = [None, None, None, None]
+def is_comm_start(p1,p2,p3):
+    #print("Frame 1 Flags:", int.from_bytes(p1[47:48], byteorder='big'))
+    #print("Frame 2 Flags:", int.from_bytes(p2[47:48], byteorder='big'))
+    #print("Frame 3 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
+
+    if len(p1) >= 48 and len(p2) >= 48 and len(p3) >= 48:
+        if int.from_bytes(p1[47:48], byteorder='big') == 2:
+            if int.from_bytes(p2[47:48], byteorder='big') == 18:
+                if int.from_bytes(p3[47:48], byteorder='big') == 16:
+                    print("Three way handshake YAY!!!")
+                    return True
+                else: return False
+            else: return False
+        else: return  False
+    else: return False
+
+def is_comm_end(p1,p2,p3,p4):
+    #print("Frame 1 Flags:", int.from_bytes(p1[47:48], byteorder='big'))
+    #print("Frame 2 Flags:", int.from_bytes(p2[47:48], byteorder='big'))
+    #print("Frame 3 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
+    #print("Frame 4 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
+
+
+    if len(p1) >= 48 and len(p2) >= 48 and len(p3) >= 48:
+        if int.from_bytes(p1[47:48], byteorder='big') == 17:
+            if int.from_bytes(p2[47:48], byteorder='big') == 16:
+                if int.from_bytes(p3[47:48], byteorder='big') == 17:
+                    if int.from_bytes(p3[47:48], byteorder='big') == 16:
+                        print("Four way handshake YAY!!!")
+                    return True
+                else: return False
+            else: return False
+        else: return  False
+    else: return False
+
+
+
 def main():
     file_choice = input("Press ENTER for DEFAULT FILE, or specify file name:")
     pcap_filename = "trace-27.pcap"
@@ -183,6 +230,9 @@ def main():
             eth_type = extract_ethertype(bytes(packet))
             udp_src, udp_dest = extract_UDP_protocols(bytes(packet))
             tcp_src, tcp_dest = extract_TCP_protocols(bytes(packet))
+            flags = None
+            comm_src = None
+            comm_dst = None
             #print(udp_dest)
 
             if eth_type is not None:
@@ -219,6 +269,42 @@ def main():
                                     well_known_src = tcp_well_known_data[tcp_src]
                                 if tcp_dest in tcp_well_known_data:
                                     well_known_dst = tcp_well_known_data[tcp_dest]
+                                flags = extract_flag(bytes(packet))
+                                if flags == 2:
+                                    #print("Syn")
+                                    comm_open[0] = bytes(packet)
+                                elif flags == 18:
+                                    #print("Syn Ack")
+                                    comm_open[1] = bytes(packet)
+                                elif flags == 16:
+                                    #print("Ack")
+                                    comm_open[2] = bytes(packet)
+                                if comm_open[0] and comm_open[1] and comm_open[2]:
+                                    if is_comm_start(comm_open[0], comm_open[1], comm_open[2]):
+                                        comm_src, comm_dst = extract_TCP_protocols(comm_open[0])
+                                        tcp_connections[0], tcp_connections[1] = extract_TCP_protocols(comm_open[0])
+                                        comm_open[:3] = [None, None, None]  # Empty the comm_open array
+                                        print(comm_src, " - ", comm_dst)
+
+                                if flags == 17:
+                                    c1,c2 = extract_TCP_protocols(bytes(packet))
+                                    print(c1, c2, tcp_connections[0], tcp_connections[1])
+                                    if c1 == tcp_connections[0] and c2 == tcp_connections[1]:
+                                        comm_close[0] = bytes(packet)
+                                    elif c1 == tcp_connections[1] and c2 == tcp_connections[0]:
+                                        comm_close[2] = bytes(packet)
+
+                                elif flags == 16:
+                                    c1,c2 = extract_TCP_protocols(bytes(packet))
+                                    if c1 == tcp_connections[1] and c2 == tcp_connections[0]:
+                                        comm_close[1] = bytes(packet)
+                                    elif c1 == tcp_connections[0] and c2 == tcp_connections[1]:
+                                        comm_close[3] = bytes(packet)
+
+                                if comm_close[0] and comm_close[1] and comm_close[2] and comm_close[3]:
+                                    if is_comm_end(comm_close[0], comm_close[1], comm_close[2], comm_close[3]):
+                                        comm_close[:4] = [None, None, None, None]
+                                        print("Comm between:", tcp_connections[0], " - ", tcp_connections[1], "ended")
 
                             if ipv4_protocol == "UDP":
                                 if udp_src in udp_well_known_data:
