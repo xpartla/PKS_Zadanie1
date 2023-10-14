@@ -107,49 +107,53 @@ def extract_flag(raw_packet):
     else:
         return None
 
+
+comm_open_srcs = []
+comm_open_dsts = []
+comm_cloes_srcs = []
+comm_close_srcs = []
+comm_counter = 0
 tcp_connections = [None, None]
 comm_open = [None, None, None]
 comm_close = [None, None, None, None]
+active_communications = []
 def is_comm_start(p1,p2,p3):
-    #print("Frame 1 Flags:", int.from_bytes(p1[47:48], byteorder='big'))
-    #print("Frame 2 Flags:", int.from_bytes(p2[47:48], byteorder='big'))
-    #print("Frame 3 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
-
+    global session_counter
     if len(p1) >= 48 and len(p2) >= 48 and len(p3) >= 48:
         if int.from_bytes(p1[47:48], byteorder='big') == 2:
             if int.from_bytes(p2[47:48], byteorder='big') == 18:
                 if int.from_bytes(p3[47:48], byteorder='big') == 16:
-                    print("Three way handshake YAY!!!")
+                    # Three-way handshake detected
+                    new_comm_session = {
+                        "comm_start": p1,
+                        "comm_syn_ack": p2,
+                        "comm_ack": p3,
+                        "comm_end": None
+                    }
+                    active_communications.append(new_comm_session)
                     return True
-                else: return False
-            else: return False
-        else: return  False
-    else: return False
+                return False
 
 def is_comm_end(p1,p2,p3,p4):
-    #print("Frame 1 Flags:", int.from_bytes(p1[47:48], byteorder='big'))
-    #print("Frame 2 Flags:", int.from_bytes(p2[47:48], byteorder='big'))
-    #print("Frame 3 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
-    #print("Frame 4 Flags:", int.from_bytes(p3[47:48], byteorder='big'))
-
-
     if len(p1) >= 48 and len(p2) >= 48 and len(p3) >= 48:
-        if int.from_bytes(p1[47:48], byteorder='big') == 17:
-            if int.from_bytes(p2[47:48], byteorder='big') == 16:
-                if int.from_bytes(p3[47:48], byteorder='big') == 17:
-                    if int.from_bytes(p3[47:48], byteorder='big') == 16:
-                        print("Four way handshake YAY!!!")
-                    return True
+        for session in active_communications:
+            if int.from_bytes(p1[47:48], byteorder='big') == 17:
+                if int.from_bytes(p2[47:48], byteorder='big') == 16:
+                    if int.from_bytes(p3[47:48], byteorder='big') == 17:
+                        if int.from_bytes(p3[47:48], byteorder='big') == 16:
+                            session["comm_end"] = p4
+                            active_communications.remove(session)
+                            print("Communication session ended")
+                        return True
+                    else: return False
                 else: return False
-            else: return False
-        else: return  False
+            else: return  False
     else: return False
-
 
 
 def main():
     file_choice = input("Press ENTER for DEFAULT FILE, or specify file name:")
-    pcap_filename = "trace-27.pcap"
+    pcap_filename = "trace_ip_nad_20_B.pcap"
     if file_choice:
         try:
             with open(file_choice, 'r'):
@@ -282,13 +286,15 @@ def main():
                                 if comm_open[0] and comm_open[1] and comm_open[2]:
                                     if is_comm_start(comm_open[0], comm_open[1], comm_open[2]):
                                         comm_src, comm_dst = extract_TCP_protocols(comm_open[0])
+                                        comm_open_srcs.insert(comm_counter, comm_src)
+                                        comm_open_dsts.insert(comm_counter, comm_dst)
                                         tcp_connections[0], tcp_connections[1] = extract_TCP_protocols(comm_open[0])
                                         comm_open[:3] = [None, None, None]  # Empty the comm_open array
-                                        print(comm_src, " - ", comm_dst)
+                                        print(f"Session between {comm_src} and  {comm_dst} started")
 
                                 if flags == 17:
                                     c1,c2 = extract_TCP_protocols(bytes(packet))
-                                    print(c1, c2, tcp_connections[0], tcp_connections[1])
+                                    #print(c1, c2, tcp_connections[0], tcp_connections[1])
                                     if c1 == tcp_connections[0] and c2 == tcp_connections[1]:
                                         comm_close[0] = bytes(packet)
                                     elif c1 == tcp_connections[1] and c2 == tcp_connections[0]:
@@ -304,7 +310,12 @@ def main():
                                 if comm_close[0] and comm_close[1] and comm_close[2] and comm_close[3]:
                                     if is_comm_end(comm_close[0], comm_close[1], comm_close[2], comm_close[3]):
                                         comm_close[:4] = [None, None, None, None]
-                                        print("Comm between:", tcp_connections[0], " - ", tcp_connections[1], "ended")
+                                        print(f"Comm between {tcp_connections[0]} and {tcp_connections[1]} ended")
+
+                                print(comm_open_srcs)
+                                #for x in comm_open_srcs:
+                                #    if (tcp_src == comm_open_srcs[x] and tcp_dest == comm_open_dsts[x]) or (tcp_src == comm_open_dsts[x] and tcp_dest == comm_open_srcs[x]):
+                                #        print("comm")
 
                             if ipv4_protocol == "UDP":
                                 if udp_src in udp_well_known_data:
