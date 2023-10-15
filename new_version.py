@@ -80,21 +80,14 @@ def print_addresses(adres):  # prints adreses in corect format
         print(" ", end="")
     print()
 
-E = {
-
-}
-
-IP = {
-
-}
-
-VSETKY_ADRESY = {
-
-}
-
-TCP = {
-
-}
+ethertype_data = {}
+udp_well_known_data = {}
+tcp_well_known_data = {}
+ipv4_protocol_data = {}
+E = {}
+IP = {}
+VSETKY_ADRESY = {}
+TCP = {}
 is_first_tftp = 0
 is_comm = 0
 frame_number = 0
@@ -110,24 +103,52 @@ tftp_struct_array = []
 def load_e():
     with open("Ethertype_data.txt", "r") as ethertype_file:
         for line in ethertype_file:
-            x, y = line.split(":", 1)
-            x = int(x)
-            y = y[0: -1]
-            E[x] = y
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                ethertype, protocol = int(parts[0]), parts[1]
+                E[ethertype] = protocol
 
     with open('Ipv4_protocol_data.txt', 'r') as ipv4_file:
         for line in ipv4_file:
-            x, y = line.split(":", 1)
-            x = int(x)
-            y = y[0: -1]
-            IP[x] = y
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                ipv4, protocol = int(parts[0]), parts[1]
+                IP[ipv4] = protocol
 
     with open('Tcp_protocol_data.txt', 'r') as tcp_file:
         for line in tcp_file:
-            x, y = line.split(":", 1)
-            x = int(x)
-            y = y[0: -1]
-            TCP[x] = y
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                tcp, protocol = int(parts[0]), parts[1]
+                TCP[tcp] = protocol
+
+    with open("Ethertype_data.txt", "r") as ethertype_file:
+        for line in ethertype_file:
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                ethertype, protocol = int(parts[0]), parts[1]
+                ethertype_data[ethertype] = protocol
+
+    with open("Udp_protocol_data.txt", "r") as udp_file:
+        for line in udp_file:
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                udp_prot, udp_well_known_protocol = int(parts[0]), parts[1]
+                udp_well_known_data[udp_prot] = udp_well_known_protocol
+
+    with open("Tcp_protocol_data.txt", "r") as tcp_file:
+        for line in tcp_file:
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                tcp_prot, tcp_well_known_protocol = int(parts[0]), parts[1]
+                tcp_well_known_data[tcp_prot] = tcp_well_known_protocol
+
+    with open("Ipv4_protocol_data.txt", "r") as ipv4_file:
+        for line in ipv4_file:
+            parts = line.strip().split(":")
+            if len(parts) == 2:
+                ipv4_prot, protocol = int(parts[0]), parts[1]
+                ipv4_protocol_data[ipv4_prot] = protocol
 
 
 
@@ -873,37 +894,7 @@ def main():
     packets_data = []
     source_ip_counter = Counter()
 
-    ethertype_data = {}
-    with open("Ethertype_data.txt", "r") as ethertype_file:
-        for line in ethertype_file:
-            parts = line.strip().split(":")
-            if len(parts) == 2:
-                ethertype, protocol = int(parts[0]), parts[1]
-                ethertype_data[ethertype] = protocol
 
-    udp_well_known_data = {}
-    with open("Udp_protocol_data.txt", "r") as udp_file:
-        for line in udp_file:
-            parts = line.strip().split(":")
-            if len(parts) == 2:
-                udp_prot, udp_well_known_protocol = int(parts[0]), parts[1]
-                udp_well_known_data[udp_prot] = udp_well_known_protocol
-
-    tcp_well_known_data = {}
-    with open("Tcp_protocol_data.txt", "r") as tcp_file:
-        for line in tcp_file:
-            parts = line.strip().split(":")
-            if len(parts) == 2:
-                tcp_prot, tcp_well_known_protocol = int(parts[0]), parts[1]
-                tcp_well_known_data[tcp_prot] = tcp_well_known_protocol
-
-    ipv4_protocol_data = {}
-    with open("Ipv4_protocol_data.txt", "r") as ipv4_file:
-        for line in ipv4_file:
-            parts = line.strip().split(":")
-            if len(parts) == 2:
-                ipv4_prot, protocol = int(parts[0]), parts[1]
-                ipv4_protocol_data[ipv4_prot] = protocol
     tftp_check_type = None
     input_protocol = None
     mode = input("Press ENTER for BASIC setup, or -p for PROTOCOL")
