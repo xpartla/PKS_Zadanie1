@@ -36,6 +36,33 @@ class tftp:  # tftp class
         self.order.append(cislo_ramca)
 
 
+class arp:  # arp class
+    def __init__(self, sender, target):
+        self.reply_order = []
+        self.reply_array = []
+        self.request_order = []
+        self.request_array = []
+        self.is_finished = 0
+        self.sender = sender
+        self.target = target
+
+    def add_request_order(self, cislo_ramca):
+        self.request_order.append(cislo_ramca)
+
+    def add_request(self, byte):
+        self.request_array.append(byte)
+
+    def add_reply_order(self, cislo_ramca):
+        self.reply_order.append(cislo_ramca)
+
+    def add_reply(self, byte):
+        self.reply_array.append(byte)
+
+
+    def sender_mac(self, sender):
+        self.sender_mac = sender
+
+
 def print_addresses(adres):  # prints adreses in corect format
     print("Zdrojová MAC adresa: ", end="")
     flag = 0
@@ -504,7 +531,7 @@ def tcp_filter(protocol):  # vypis ulohy 4a
         print("V tomto pakete sa nenachadza nekompletna komunikacia")
 
 
-def tftp_filter(packet):   # nacitanie ulohy 4g
+def tftp_filter_by_opcode(packet):   # nacitanie ulohy 4g
     global frame_number
     global is_first_tftp
     frame_number += 1
@@ -536,7 +563,7 @@ def tftp_filter(packet):   # nacitanie ulohy 4g
             for x in tftp_struct_array:
                 if is_first_tftp == 1:
                     if is_comm and (x.source_port == destination_port or x.source_port == source_port):#kukam iba jeden chcel by som obidva
-                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2: -1], 16) == 5:
+                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2: -1], 16) == 5:   #opcode
                             x.comm_packets.append(packet)
                             x.add_order(frame_number)
                             is_comm = 0
@@ -547,7 +574,7 @@ def tftp_filter(packet):   # nacitanie ulohy 4g
                             x.comm_packets.append(packet)
                 else:
                     if is_comm and ((x.source_port == source_port and x.destination_port == destination_port) or x.source_port == destination_port and x.destination_port == source_port):#kukam iba jeden chcel by som obidva
-                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2: -1], 16) == 5:
+                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2: -1], 16) == 5:   #opcode
                             x.comm_packets.append(packet)
                             x.add_order(frame_number)
                             is_comm = 0
@@ -555,6 +582,68 @@ def tftp_filter(packet):   # nacitanie ulohy 4g
                         else:
                             x.add_order(frame_number)
                             x.comm_packets.append(packet)
+
+
+def tftp_filter_by_block_size(packet):
+    global frame_number
+    global is_first_tftp
+    frame_number += 1
+    global is_comm
+    destination_port = 0
+    source_port = 0
+    expected_block_size = 512  # Standard block size
+
+    num_dec = int(str(hexlify(packet[12:14]))[2:-1], 16)
+    if num_dec == 2048:
+        ip_protocol = protocol_ip_type(int(str(hexlify(packet[23:24]))[2:-1], 16))
+        offset = int(str(hexlify(packet[14:15]))[3:-1], 16) * 4 + 14
+        if ip_protocol == "UDP":
+            source_port = int(str(hexlify(packet[offset:offset + 2]))[2:-1], 16)
+            destination_port = int(str(hexlify(packet[offset + 2:offset + 4]))[2:-1], 16)
+
+            if destination_port == 69:
+                is_first_tftp = 1
+                if is_comm == 1:
+                    is_comm = 0
+                if is_comm == 0:
+                    is_comm = 1
+                    expected_block_size = 512  # Reset expected block size for a new session
+
+                    filtering = tftp(source_port, destination_port)
+                    filtering.comm_packets.append(packet)
+                    filtering.add_order(frame_number)
+                    tftp_struct_array.append(filtering)
+                    return
+        if ip_protocol == "UDP":
+            for x in tftp_struct_array:
+                if is_first_tftp == 1:
+                    if is_comm and (x.source_port == destination_port or x.source_port == source_port):
+                        data_size = len(packet[offset + 4:])  # Calculate the size of the data portion
+                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2:-1], 16) == 5:
+                            x.comm_packets.append(packet)
+                            x.add_order(frame_number)
+                            is_comm = 0
+                            break
+                        else:
+                            x.destination_port = source_port
+                            x.add_order(frame_number)
+                            x.comm_packets.append(packet)
+                            if data_size < expected_block_size:
+                                is_comm = 0  # Last data block, end the session
+                else:
+                    if is_comm and ((x.source_port == source_port and x.destination_port == destination_port) or (x.source_port == destination_port and x.destination_port == source_port)):
+                        data_size = len(packet[offset + 4:])  # Calculate the size of the data portion
+                        if int(str(hexlify(packet[offset + 8:offset + 10]))[2:-1], 16) == 5:
+                            x.comm_packets.append(packet)
+                            x.add_order(frame_number)
+                            is_comm = 0
+                            break
+                        else:
+                            x.add_order(frame_number)
+                            x.comm_packets.append(packet)
+                            if data_size < expected_block_size:
+                                is_comm = 0  # Last data block, end the session
+
 
 
 def tftp_output():  # vypis ulohy 4g
@@ -601,6 +690,172 @@ def tftp_output():  # vypis ulohy 4g
                         print("zdrojovy port:", tcp_source_port)
                         print("cielovy port:", tcp_destination_port)
         print()
+
+def uloha_4i():  #vypise ulohu 4i
+    global arp_zoznam
+    y = 0
+    packet = 0
+    for packet in arp_zoznam:
+        #sender_ip_adress = get_ipv4(packet[1][28:32])
+        #target_ip_adress = get_ipv4(packet[1][38:42])
+        sender_ip_adress, target_ip_adress = extract_ipv4_ip(packet[1])
+        sender_mac_adress = str(hexlify(packet[1][22:28]))[2: -1]
+        target_mac_adres = str(hexlify(packet[1][32:38]))[2: -1]
+        Opcode = (int(str(hexlify(packet[1][21:22]))[2: -1], 16))
+        first = arp(sender_ip_adress, target_ip_adress)
+
+        if len(struct_array) == 0:
+            if Opcode == 1:
+                first.add_request(packet[1])
+                first.add_request_order(packet[0])
+            if Opcode == 2:
+                first.add_reply(packet[1])
+                first.add_reply_order(packet[0])
+                first.is_finished = 1
+
+            first.sender_mac(sender_mac_adress)
+            struct_array.append(first)
+
+        else:
+            urobene = 0
+            for x in struct_array:
+                if (((x.sender == sender_ip_adress and x.target == target_ip_adress) or (x.sender == target_ip_adress and x.target == sender_ip_adress)) and (x.sender_mac == sender_mac_adress or x.sender_mac == target_mac_adres)):
+                    if Opcode == 1:
+                        x.add_request(packet[1])
+                        x.add_request_order(packet[0])
+                    if Opcode == 2:
+                        x.add_reply(packet[1])
+                        x.add_reply_order(packet[0])
+                        x.is_finished = 1
+                    urobene = 1
+                    break
+            if urobene == 0:
+                if Opcode == 1:
+                    first.add_request(packet[1])
+                    first.add_request_order(packet[0])
+                if Opcode == 2:
+                    first.add_reply(packet[1])
+                    first.add_reply_order(packet[0])
+                    first.is_finished = 1
+                first.sender_mac(sender_mac_adress)
+                struct_array.append(first)
+
+    dvojica_counter = 0
+    counter_reply = 0
+    counter_request = 0
+    counter_other = 0
+    counter_all = 0
+    counter = 0
+    counter_poradove_cislo_ramca = 0
+    counter_order = 0
+    counter_reply = 0
+    for x in struct_array:
+        counter_order = 0
+        counter_poradove_cislo_ramca = 0
+        counter += 1
+        print("Komunikacia", counter)
+        counter_spravna = 0
+        for y in x.request_array:
+
+            src, dst = extract_ipv4_ip(y)
+            hlp, tar = extract_arp_ip(y)
+            print("ARP-request IP adresa:", tar, "MAC adresa ???")
+            print("Zdrojova ip:", src, "Cielova ip:", dst)
+            print("Ramec ", x.request_order[counter_order], ": ", sep="")
+            counter_order += 1
+            word = str(hexlify(y[32:38]))[2: -1]
+            counter_word = 0
+            print("dĺžka rámca poskytnutá pcap API – ", len(packet), "B")
+            if len(packet) < 60:
+                print("dĺžka rámca prenášaného po médiu – 64 B", )
+            else:
+                print("dĺžka rámca prenášaného po médiu", len(packet) + 4, "B")
+            print("Ethernet II")
+            print("ARP")
+
+            print("Zdrojova mac adresa ", end="")
+            word = str(hexlify(y[22:28]))[2: -1]
+            counter_word = 0
+            for z in word:
+                if counter_word % 2 == 0 and counter_word > 1:
+                    print(" ", end="")
+                print(z, end="")
+                counter_word += 1
+            print()
+
+            print("Cielova mac adresa ", end="")
+            word = str(hexlify(y[32:38]))[2: -1]
+            counter_word = 0
+            for z in word:
+                if counter_word % 2 == 0 and counter_word > 1:
+                    print(" ", end="")
+                print(z, end="")
+                counter_word += 1
+            print()
+            print()
+            #print_hexa(y)
+            hex_data = ' '.join(['{:02X}'.format(byte) for byte in y])
+            hex_numbers = hex_data.split()
+            rows_of_16 = [hex_numbers[i:i + 16] for i in range(0, len(hex_numbers), 16)]
+
+            hexa_frame_content = '\n'.join([' '.join(row) for row in rows_of_16])
+            print(hexa_frame_content)
+            print()
+        for z in (x.reply_array):
+
+            src, dst = extract_ipv4_ip(z)
+            hlp, tar = extract_arp_ip(z)
+            print("ARP-reply IP adresa:", tar, "MAC adresa", end="")
+            word = str(hexlify(z[32:38]))[2: -1]
+            counter_word = 0
+            for u in word:
+                if counter_word % 2 == 0 and counter_word > 1:
+                    print(" ", end="")
+                print(u, end="")
+                counter_word += 1
+            print()
+            print("Zdrojova ip:", src, "Cielova ip:", dst)
+            print("Ramec ", x.reply_order[counter_reply], ": ", sep="")
+            counter_reply += 1
+            word = str(hexlify(z[32:38]))[2: -1]
+            counter_word = 0
+
+            print("dĺžka rámca poskytnutá pcap API – ", len(packet), "B")
+            if len(packet) < 60:
+                print("dĺžka rámca prenášaného po médiu – 64 B", )
+            else:
+                print("dĺžka rámca prenášaného po médiu", len(packet) + 4, "B")
+            print("Ethernet II")
+            print("ARP")
+
+            print("Zdrojova mac adresa ", end="")
+            word = str(hexlify(z[22:28]))[2: -1]
+            counter_word = 0
+            for u in word:
+                if counter_word % 2 == 0 and counter_word > 1:
+                    print(" ", end="")
+                print(u, end="")
+                counter_word += 1
+            print()
+
+            print("Cielova mac adresa ", end="")
+            word = str(hexlify(z[32:38]))[2: -1]
+            counter_word = 0
+            for u in word:
+                if counter_word % 2 == 0 and counter_word > 1:
+                    print(" ", end="")
+                print(u, end="")
+                counter_word += 1
+            print()
+            print()
+            #print_hexa(z)
+            hex_data = ' '.join(['{:02X}'.format(byte) for byte in z])
+            hex_numbers = hex_data.split()
+            rows_of_16 = [hex_numbers[i:i + 16] for i in range(0, len(hex_numbers), 16)]
+
+            hexa_frame_content = '\n'.join([' '.join(row) for row in rows_of_16])
+            print(hexa_frame_content)
+            print()
 
 
 def main():
@@ -649,7 +904,7 @@ def main():
             if len(parts) == 2:
                 ipv4_prot, protocol = int(parts[0]), parts[1]
                 ipv4_protocol_data[ipv4_prot] = protocol
-
+    tftp_check_type = None
     input_protocol = None
     mode = input("Press ENTER for BASIC setup, or -p for PROTOCOL")
     if mode == 'p':
@@ -659,6 +914,9 @@ def main():
         print("4g) - 4h):\t ICMP")
         print("4i):\t\t ARP")
         input_protocol = input(">").strip().upper()
+        if input_protocol == "TFTP":
+            print("The filter works by checking the OPCODE for errors, if you want to filter by the size of last datagram, press -d")
+            tftp_check_type = input(">")
 
     try:
         packets = rdpcap(pcap_filename)
@@ -722,13 +980,22 @@ def main():
                 counter += 1
 
             elif input_protocol == "TFTP":
-                tftp_filter(bytes(packet))
-                if counter == len(packets):
-                    tftp_output()
-                counter += 1
+                if tftp_check_type == 'd':
+                    tftp_filter_by_block_size(bytes(packet))
+                    if counter == len(packets):
+                        tftp_output()
+                    counter += 1
+                else:
+                    tftp_filter_by_block_size(bytes(packet))
+                    if counter == len(packets):
+                        tftp_output()
+                    counter += 1
 
             elif input_protocol == "ARP":
-                pass
+                napln_listy(bytes(packet))
+                if counter == len(packets):
+                    uloha_4i()
+                counter += 1
 
             elif input_protocol == "ICMP":
                 pass

@@ -3900,19 +3900,3 @@ packets:
     IpV4 protocol: UDP
     udp_src: 58802
     udp_dest: 46201
-  - frame_number: 126
-    len_frame_pcap: 46
-    len_frame_medium: 64
-    frame_type: ETHERNET II
-    src_mac: 08:00:27:F6:18:F9
-    dst_mac: 00:16:E6:54:C8:97
-    hexa_frame: |
-      00 16 E6 54 C8 97 08 00 27 F6 18 F9 08 00 45 00
-      00 20 36 85 40 00 40 11 AB FB AC 1A 00 14 AC 1A
-      00 04 B4 79 E5 B2 00 0C 0D 58 00 04 00 01
-    vnoreny protokol (2a): Internet IP (IPv4)
-    src_ip: 172.26.0.20
-    dst_ip: 172.26.0.4
-    IpV4 protocol: UDP
-    udp_src: 46201
-    udp_dest: 58802
