@@ -119,7 +119,7 @@ def print_addresses(adres):  # prints adreses in corect format
     print()"""
 
 
-
+struct_dict = {}
 ethertype_data = {}
 udp_well_known_data = {}
 tcp_well_known_data = {}
@@ -429,20 +429,22 @@ def is_comm_end(p1,p2,p3,p4):
     else: return False
 
 
-def tcp_filter(protocol):  # vypis ulohy 4a
+complete_communications = {}
+incomplete_communications = {}
+
+
+def tcp_filter(protocol):
     global struct_array
     offset = 0
-    #print("x")
-
-    # do funkcie mi ide dobre naplneny zoznam, problem je s filtrovanim
-    #check vypisana_spravna variable - fishy
+    comm_key = 0
 
     for packet in protocol:
-        #print("Y")
-        offset = int(str(hexlify(packet[1][14:15]))[3: -1], 16) * 4 + 14  # ofset pouzivam na spravne posuvanie sa v bytoch
-        #source = get_ipv4(packet[1][26:30])  # source ip
-        #dest = get_ipv4(packet[1][30:34])  # dest ip
-        source, dest = extract_ipv4_ip(packet[1])       # not sure
+        # print("Y")
+        offset = int(str(hexlify(packet[1][14:15]))[3: -1],
+                     16) * 4 + 14  # ofset pouzivam na spravne posuvanie sa v bytoch
+        # source = get_ipv4(packet[1][26:30])  # source ip
+        # dest = get_ipv4(packet[1][30:34])  # dest ip
+        source, dest = extract_ipv4_ip(packet[1])  # not sure
         tcp_source_port = int(str(hexlify(packet[1][offset:offset + 2]))[2: -1], 16)  # tcp source port
         tcp_destination_port = int(str(hexlify(packet[1][offset + 2:offset + 4]))[2: -1], 16)  # tcp dest port
         first = Commun(source, dest, tcp_source_port, tcp_destination_port)
@@ -456,8 +458,10 @@ def tcp_filter(protocol):  # vypis ulohy 4a
         else:
             done = 0
             for x in struct_array:
-                if (x.source == dest and x.source_port == tcp_destination_port and x.dest == source and x.dest_port == tcp_source_port)\
-                        or (x.source == source and x.source_port == tcp_source_port and x.dest == dest and x.dest_port == tcp_destination_port):  # trosku zvacsit podmienku
+                if (
+                        x.source == dest and x.source_port == tcp_destination_port and x.dest == source and x.dest_port == tcp_source_port) \
+                        or (
+                        x.source == source and x.source_port == tcp_source_port and x.dest == dest and x.dest_port == tcp_destination_port):  # trosku zvacsit podmienku
                     x.add_order(packet[0])
                     x.add_to_packet(packet[1])
                     done = 1
@@ -488,11 +492,10 @@ def tcp_filter(protocol):  # vypis ulohy 4a
                 struct_array[counter_kde_som] = 0
                 counter_kde_som += 1
 
-
     for x in struct_array:
         if x == 0:
             continue
-        offset1,offset2,offset3,start1,start2,start3,end1,end2,end3,end4=0,0,0,0,0,0,0,0,0,0
+        offset1, offset2, offset3, start1, start2, start3, end1, end2, end3, end4 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         offset1 = int(str(hexlify(x.comm_packets[0][14:15]))[3: -1], 16) * 4 + 14
         offset2 = int(str(hexlify(x.comm_packets[1][14:15]))[3: -1], 16) * 4 + 14
         offset3 = int(str(hexlify(x.comm_packets[2][14:15]))[3: -1], 16) * 4 + 14
@@ -509,7 +512,9 @@ def tcp_filter(protocol):  # vypis ulohy 4a
             end3 = int(str(hexlify(x.comm_packets[-3][offset3 + 13: offset + 14]))[2: -1], 16)
             end4 = int(str(hexlify(x.comm_packets[-4][offset3 + 13: offset + 14]))[2: -1], 16)
 
-        if (start1 == 2 and start2 == 18 and start3 == 16) and ((end1 == 4) or (end1 == 20) or (end1 == 16 and end2 == 17 and end3 == 17) or (end1 == 16 and end2 == 17 and end3 == 16 and end4 == 17)):
+        if (start1 == 2 and start2 == 18 and start3 == 16) and (
+                (end1 == 4) or (end1 == 20) or (end1 == 16 and end2 == 17 and end3 == 17) or (
+                end1 == 16 and end2 == 17 and end3 == 16 and end4 == 17)):
             x.is_complete = 1
         else:
             x.is_complete = 0
@@ -522,76 +527,65 @@ def tcp_filter(protocol):  # vypis ulohy 4a
     for x in struct_array:
         if x == 0:
             continue
-        if x.is_complete == 1 and vypisana_spravna == 0:
-            print("Vypis kompletnej komunikacie")
-            for y in x.comm_packets:
+        if x.is_complete == 1:
+            #complete_communications[comm_key] = x
+            key = f"{x.source}:{x.source_port}-{x.dest}:{x.dest_port}"
+            complete_communications[key] = x
+
+        if x.is_complete == 0:
+            key = f"{x.source}:{x.source_port}-{x.dest}:{x.dest_port}"
+            incomplete_communications[key] = x
+            """print(len(complete_communications))
+            print(len(incomplete_communications))
+            for packet in complete_communications:
+                #source, dest = extract_ipv4_ip(packet)
+                print(packet)
+            for packet in incomplete_communications:
+                #source, dest = extract_ipv4_ip(packet)
+                print(packet)
+            return complete_communications, incomplete_communications
+    
+    for key, communication in complete_communications.items():
+        print(f"Source: {communication.source}")
+        print(f"Destination: {communication.dest}")
+        print(f"Source Port: {communication.source_port}")
+        print(f"Destination Port: {communication.dest_port}")"""
+def print_complete_tcp(protocol, complete_communications):
+    communication_counter = 0
+    offset = 0
+    one_printed = 0
+
+    for key, communication in complete_communications.items():
+        communication_counter += 1
+        print("Vypis kompletnej komunikacie")
+        print("Comm number: ", communication_counter)
+
+        for packet in protocol:
+            #print(packet[1])
+            y = packet[1]
+            offset = int(str(hexlify(packet[1][14:15]))[3: -1], 16) * 4 + 14  # ofset pouzivam na spravne posuvanie sa v bytoch
+            src, dst = extract_ipv4_ip(y)
+            tcp_source_port = int(str(hexlify(packet[1][offset:offset + 2]))[2: -1], 16)  # tcp source port
+            tcp_destination_port = int(str(hexlify(packet[1][offset + 2:offset + 4]))[2: -1], 16)  # tcp dest port
+            """print(tcp_source_port)
+            print(tcp_destination_port)
+            print(communication.source_port)
+            print(communication.dest_port)
+            print("-"*20)"""
+            #if (src == communication.source and dst == communication.dest and tcp_source_port == communication.source_port and tcp_destination_port == communication.dest_port) or (dst == communication.source and src == communication.dest and tcp_destination_port == communication.source_port and tcp_source_port == communication.dest_port):
+            if (tcp_source_port == communication.source_port and tcp_destination_port == communication.dest_port) or (tcp_source_port == communication.dest_port and tcp_destination_port == communication.source_port):
                 #print(y)
-                counter_spravna += 1
-                vypisana_spravna = 1
-                if (len(x.comm_packets) > 20 and counter_spravna > 10) and len(x.comm_packets) - counter_spravna >= 10:
-                    counter_ramca += 1
-                    continue
-                print("Ramec ", x.order[counter_ramca], ": ", sep="")
+                one_printed = 1
+                print("Ramec ", packet[0])
                 print("dĺžka rámca poskytnutá pcap API – ", len(y), "B")
                 if len(y) < 60:
                     print("dĺžka rámca prenášaného po médiu – 64 B", )
                 else:
                     print("dĺžka rámca prenášaného po médiu", len(y) + 4, "B")
-                counter_ramca += 1
                 num_dec = int(str(hexlify(y[12:14]))[2: -1], 16)
                 if num_dec > 1500:
                     print("Ethernet II")
-                    #print_addresses(y)
-                    dest_mac, src_mac = extract_mac(y)
-                    print("Zdrojová MAC adresa: ", end="")
-                    print(src_mac)
-                    print("Cielova MAC adresa: ", end="")
-                    print(dest_mac)
-                    print_protocol_ether_type(num_dec)
-                    if num_dec == 2048:
-                        ip_protocol = protocol_ip_type(int(str(hexlify(y[23:24]))[2: -1], 16))
-                        count_addresses(y[30:34])
-                        offset = int(str(hexlify(y[14:15]))[3: -1], 16) * 4 + 14
-                        if ip_protocol == "TCP":
-                            source, dest = extract_ipv4_ip(y)
-                            print("Zdrojova IP adresa: ", source)
-                            #print("Zdrojova IP adresa: ", end="")
-                            #source = print_ipv4(y[26:30])
-                            print("Cielova IP adresa: ", dest)
-                            #print("Cielova IP adresa: ", end="")
-                            #dest = print_ipv4(y[30:34])
-                            print(ip_protocol)
-                            tcp_source_port = int(str(hexlify(y[offset:offset + 2]))[2: -1], 16)
-                            tcp_destination_port = int(str(hexlify(y[offset + 2:offset + 4]))[2: -1], 16)
-                            if tcp_source_port < tcp_destination_port:
-                                tcp_well_known_port(tcp_source_port)
-                            else:
-                                tcp_well_known_port(tcp_destination_port)
-                            print("zdrojovy port:", tcp_source_port)
-                            print("cielovy port:", tcp_destination_port)
-    counter_ramca = 0
-    for x in struct_array:
-        if x == 0:
-            continue
-        if x.is_complete == 0 and vypisana_nespravna == 0:
-            print("Vypis nekompletnej komunikacie")
-            for y in x.comm_packets:
-                counter_nespravna += 1
-                vypisana_nespravna = 1
-                if (len(x.comm_packets) > 20 and counter_nespravna > 10) and len(x.comm_packets) - counter_nespravna >= 10:
-                    counter_ramca += 1
-                    continue
-                print("Ramec ", x.order[counter_ramca], ": ", sep="")
-                print("dĺžka rámca poskytnutá pcap API – ", len(y), "B")
-                if len(y) < 60:
-                    print("dĺžka rámca prenášaného po médiu – 64 B", )
-                else:
-                    print("dĺžka rámca prenášaného po médiu", len(y) + 4, "B")
-                counter_ramca += 1
-                num_dec = int(str(hexlify(y[12:14]))[2: -1], 16)
-                if num_dec > 1500:
-                    print("Ethernet II")
-                    #print_addresses(y)
+                    # print_addresses(y)
                     dest_mac, src_mac = extract_mac(y)
                     print("Zdrojová MAC adresa: ", end="")
                     print(src_mac)
@@ -610,6 +604,7 @@ def tcp_filter(protocol):  # vypis ulohy 4a
                             print("Cielova IP adresa: ", dest)
                             # print("Cielova IP adresa: ", end="")
                             # dest = print_ipv4(y[30:34])
+                            print(ip_protocol)
                             tcp_source_port = int(str(hexlify(y[offset:offset + 2]))[2: -1], 16)
                             tcp_destination_port = int(str(hexlify(y[offset + 2:offset + 4]))[2: -1], 16)
                             if tcp_source_port < tcp_destination_port:
@@ -618,12 +613,74 @@ def tcp_filter(protocol):  # vypis ulohy 4a
                                 tcp_well_known_port(tcp_destination_port)
                             print("zdrojovy port:", tcp_source_port)
                             print("cielovy port:", tcp_destination_port)
-    if vypisana_spravna == 0:
+    if one_printed == 0:
         print("v tomto pakete sa nenachadza kompletna komunikacia")
-    if vypisana_nespravna ==0:
+
+def print_incomplete_tcp(protocol, incomplete_communications):
+    communication_counter = 0
+    offset = 0
+    one_printed = 0
+
+    for key, communication in incomplete_communications.items():
+        communication_counter += 1
+        print("Vypis nekompletnej komunikacie")
+        print("Comm number: ", communication_counter)
+        for packet in protocol:
+            #print(packet[1])
+            y = packet[1]
+            offset = int(str(hexlify(packet[1][14:15]))[3: -1], 16) * 4 + 14  # ofset pouzivam na spravne posuvanie sa v bytoch
+            src, dst = extract_ipv4_ip(y)
+            tcp_source_port = int(str(hexlify(packet[1][offset:offset + 2]))[2: -1], 16)  # tcp source port
+            tcp_destination_port = int(str(hexlify(packet[1][offset + 2:offset + 4]))[2: -1], 16)  # tcp dest port
+            """print(tcp_source_port)
+            print(tcp_destination_port)
+            print(communication.source_port)
+            print(communication.dest_port)
+            print("-"*20)"""
+            #if (src == communication.source and dst == communication.dest and tcp_source_port == communication.source_port and tcp_destination_port == communication.dest_port) or (dst == communication.source and src == communication.dest and tcp_destination_port == communication.source_port and tcp_source_port == communication.dest_port):
+            if (tcp_source_port == communication.source_port and tcp_destination_port == communication.dest_port) or (tcp_source_port == communication.dest_port and tcp_destination_port == communication.source_port):
+                #print(y)
+                one_printed = 1
+                print("Ramec ", packet[0])
+                print("dĺžka rámca poskytnutá pcap API – ", len(y), "B")
+                if len(y) < 60:
+                    print("dĺžka rámca prenášaného po médiu – 64 B", )
+                else:
+                    print("dĺžka rámca prenášaného po médiu", len(y) + 4, "B")
+                num_dec = int(str(hexlify(y[12:14]))[2: -1], 16)
+                if num_dec > 1500:
+                    print("Ethernet II")
+                    # print_addresses(y)
+                    dest_mac, src_mac = extract_mac(y)
+                    print("Zdrojová MAC adresa: ", end="")
+                    print(src_mac)
+                    print("Cielova MAC adresa: ", end="")
+                    print(dest_mac)
+                    print_protocol_ether_type(num_dec)
+                    if num_dec == 2048:
+                        ip_protocol = protocol_ip_type(int(str(hexlify(y[23:24]))[2: -1], 16))
+                        count_addresses(y[30:34])
+                        offset = int(str(hexlify(y[14:15]))[3: -1], 16) * 4 + 14
+                        if ip_protocol == "TCP":
+                            source, dest = extract_ipv4_ip(y)
+                            print("Zdrojova IP adresa: ", source)
+                            # print("Zdrojova IP adresa: ", end="")
+                            # source = print_ipv4(y[26:30])
+                            print("Cielova IP adresa: ", dest)
+                            # print("Cielova IP adresa: ", end="")
+                            # dest = print_ipv4(y[30:34])
+                            print(ip_protocol)
+                            tcp_source_port = int(str(hexlify(y[offset:offset + 2]))[2: -1], 16)
+                            tcp_destination_port = int(str(hexlify(y[offset + 2:offset + 4]))[2: -1], 16)
+                            if tcp_source_port < tcp_destination_port:
+                                tcp_well_known_port(tcp_source_port)
+                            else:
+                                tcp_well_known_port(tcp_destination_port)
+                            print("zdrojovy port:", tcp_source_port)
+                            print("cielovy port:", tcp_destination_port)
+        break
+    if one_printed == 0:
         print("V tomto pakete sa nenachadza nekompletna komunikacia")
-
-
 def tftp_filter_by_opcode(packet):   # nacitanie ulohy 4g
     global frame_number
     global is_first_tftp
@@ -1179,37 +1236,50 @@ def main():
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     tcp_filter(http_zoznam)
+                    print_complete_tcp(http_zoznam, complete_communications)
+                    print_incomplete_tcp(http_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "FTP-D":
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     #print("test")
+                    print(len(ftp_d_zoznam))
                     tcp_filter(ftp_d_zoznam)
+                    print_complete_tcp(ftp_d_zoznam, complete_communications)
+                    print_incomplete_tcp(ftp_d_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "TELNET":
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     tcp_filter(telnet_zoznam)
+                    print_complete_tcp(telnet_zoznam, complete_communications)
+                    print_incomplete_tcp(telnet_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "HTTPS":
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     tcp_filter(https_zoznam)
+                    print_complete_tcp(https_zoznam, complete_communications)
+                    print_incomplete_tcp(https_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "SSH":
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     tcp_filter(ssh_zoznam)
+                    print_complete_tcp(ssh_zoznam, complete_communications)
+                    print_incomplete_tcp(ssh_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "FTP-R":
                 napln_listy(bytes(packet))
                 if counter == len(packets):
                     tcp_filter(ftp_r_zoznam)
+                    print_complete_tcp(ftp_r_zoznam, complete_communications)
+                    print_incomplete_tcp(ftp_r_zoznam, incomplete_communications)
                 counter += 1
 
             elif input_protocol == "TFTP":
